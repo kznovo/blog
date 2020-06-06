@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet"
+      href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/10.0.0/styles/tomorrow.min.css">
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/10.0.0/highlight.min.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/10.0.0/languages/dockerfile.min.js"></script>
+<script>hljs.initHighlightingOnLoad();</script>
+
+<title>SQL Server でクエリをジョブ化する</title>
+
+<strong>SQL Server でクエリをジョブ化する</strong>
+<hr>
+
+<p>
+  SQLサーバで何十分もかかるストアドプロシージャを実行すると、実行クライアントを開けっぱなしにしないといけないのが不便になることがある。
+  SQL Server Agent を使うと、裏でジョブ実行できて便利。
+</p>
+<p>
+  ジョブ化したいSPは以下：
+</p>
+
+<pre><code class="sql">
+CREATE DATABASE testdb;
+GO
+
+USE testdb;
+GO
+
+CREATE TABLE dbo.test_table (
+    id INT NOT NULL IDENTITY PRIMARY KEY
+    , field SYSNAME
+    , created_at DATETIME NOT NULL DEFAULT GETDATE()
+);
+GO
+
+/* このSPをジョブ化したい */
+CREATE OR ALTER PROCEDURE dbo.usp_test_table_insert
+    @field SYSNAME
+AS
+    INSERT INTO dbo.test_table (field) VALUES (@field);
+
+</code></pre>
+
+<p>
+  実行ジョブ作成：
+</p>
+
+<pre><code class="sql">
+USE msdb;
+GO
+
+EXEC dbo.sp_add_job
+    @job_name = N'test_job';
+
+EXEC sp_add_jobstep
+    @job_name = N'test_job',
+    @step_name = N'process step',
+    @subsystem = N'TSQL',
+    @command = N'test.dbo.usp_test_table_insert'; -- ここでジョブ化したいSP名指定
+
+EXEC dbo.sp_add_jobserver
+    @job_name =  N'test_job';
+
+</code></pre>
+
+<p>
+  ジョブ実行：
+</p>
+
+<pre><code class="sql">
+DECLARE @ReturnCode int;
+EXEC @ReturnCode = dbo.sp_start_job N'test_job';
+PRINT @ReturnCode; -- 0ならOK、1ならエラー
+GO
+
+</code></pre>
+
+<p>
+  SQL Server Agent を LinuxベースのDockerコンテナ 版SQL Serverで動かすためには、SQL Server Agentの機能をオンにしないといけない。SQLサーバ再起動が必要な作業なので、Dockerfileを新規作成します。
+</p>
+
+<pre><code class="dockerfile">
+FROM mcr.microsoft.com/mssql/server:2017-latest
+RUN /opt/mssql/bin/mssql-conf set sqlagent.enabled true
+
+</code></pre>
+
+<hr>
+<a href="/blog/">blog top</a>
