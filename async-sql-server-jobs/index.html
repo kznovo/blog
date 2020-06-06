@@ -35,10 +35,9 @@ CREATE TABLE dbo.test_table (
 GO
 
 /* このSPをジョブ化したい */
-CREATE OR ALTER PROCEDURE dbo.usp_test_table_insert
-    @field SYSNAME
+CREATE OR ALTER PROCEDURE dbo.usp_test_table_insert_row
 AS
-    INSERT INTO dbo.test_table (field) VALUES (@field);
+    INSERT INTO dbo.test_table (field) VALUES ('Hello');
 
 </code></pre>
 
@@ -57,7 +56,7 @@ EXEC sp_add_jobstep
     @job_name = N'test_job',
     @step_name = N'process step',
     @subsystem = N'TSQL',
-    @command = N'test.dbo.usp_test_table_insert'; -- ここでジョブ化したいSP名指定
+    @command = N'test.dbo.usp_test_table_insert_row'; -- ここでジョブ化したいSP名指定
 
 EXEC dbo.sp_add_jobserver
     @job_name =  N'test_job';
@@ -81,6 +80,7 @@ GO
 </p>
 
 <pre><code class="dockerfile">
+# Dockerfile
 FROM mcr.microsoft.com/mssql/server:2017-latest
 RUN /opt/mssql/bin/mssql-conf set sqlagent.enabled true
 
